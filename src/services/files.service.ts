@@ -6,7 +6,9 @@ const AUDIO_EXTENSIONS = [".mp3", ".wav", ".ogg", ".flac"] as const;
 export type ScanErrorCode =
   | "PATH_MISSING"
   | "PATH_NOT_FOUND"
-  | "PATH_NOT_DIRECTORY";
+  | "PATH_NOT_DIRECTORY"
+  | "PATH_NOT_ACCESSIBLE"
+  | "PATH_READ_ERROR";
 
 export class ScanError extends Error {
   readonly code: ScanErrorCode;
@@ -40,12 +42,31 @@ function isAudioFile(name: string): boolean {
   return AUDIO_EXTENSIONS.some((audioExtension) => audioExtension === extension);
 }
 
+function toScanError(error: unknown, message: string): ScanError {
+  const systemCode = (error as NodeJS.ErrnoException | null)?.code;
+
+  if (systemCode === "EACCES" || systemCode === "EPERM") {
+    return new ScanError("PATH_NOT_ACCESSIBLE", message);
+  }
+
+  if (systemCode === "ENOENT") {
+    return new ScanError("PATH_NOT_FOUND", message);
+  }
+
+  return new ScanError("PATH_READ_ERROR", message);
+}
+
 async function walk(
   directoryPath: string,
   rootPath: string,
   files: AudioFile[],
 ): Promise<void> {
-  const entries = await readdir(directoryPath, { withFileTypes: true });
+  let entries;
+  try {
+    entries = await readdir(directoryPath, { withFileTypes: true });
+  } catch (error) {
+    throw toScanError(error, `Unable to read directory: ${directoryPath}`);
+  }
 
   for (const entry of entries) {
     if (entry.isSymbolicLink()) {
@@ -63,7 +84,13 @@ async function walk(
       continue;
     }
 
-    const info = await stat(fullPath);
+    let info;
+    try {
+      info = await stat(fullPath);
+    } catch {
+      continue;
+    }
+
     files.push({
       path: fullPath,
       relativePath: relative(rootPath, fullPath),
@@ -85,8 +112,24 @@ export async function scanDirectory(rootPath: string): Promise<ScanResult> {
   let info;
   try {
     info = await stat(resolvedPath);
-  } catch {
-    throw new ScanError("PATH_NOT_FOUND", `Path not found: ${resolvedPath}`);
+  } catch (error) {
+    const systemCode = (error as NodeJS.ErrnoException | null)?.code;
+
+    if (systemCode === "EACCES" || systemCode === "EPERM") {
+      throw new ScanError(
+        "PATH_NOT_ACCESSIBLE",
+        `Path is not accessible: ${resolvedPath}`,
+      );
+    }
+
+    if (systemCode === "ENOENT") {
+      throw new ScanError("PATH_NOT_FOUND", `Path not found: ${resolvedPath}`);
+    }
+
+    throw new ScanError(
+      "PATH_READ_ERROR",
+      `Unable to inspect path: ${resolvedPath}`,
+    );
   }
 
   if (!info.isDirectory()) {
