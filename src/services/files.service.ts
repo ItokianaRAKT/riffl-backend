@@ -1,7 +1,7 @@
 import { readdir, stat } from "node:fs/promises";
 import { extname, join, relative, resolve } from "node:path";
 
-const AUDIO_EXTENSIONS = [".mp3", ".wav", ".ogg", ".flac"] as const;
+const AUDIO_EXTENSIONS = [".mp3", ".mp4", ".wav", ".ogg", ".flac"] as const;
 
 export type ScanErrorCode =
   | "PATH_MISSING"
@@ -76,6 +76,10 @@ async function walk(
     const fullPath = join(directoryPath, entry.name);
 
     if (entry.isDirectory()) {
+      if (entry.name === "riffl") {
+        continue;
+      }
+
       await walk(fullPath, rootPath, files);
       continue;
     }
