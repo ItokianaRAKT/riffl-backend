@@ -1,9 +1,18 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  copyFile,
+  mkdir,
+  mkdtemp,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { ScanError, scanDirectory } from "./files.service.js";
+import { writeTags } from "./tags.service.js";
 
 let fixtureRoot: string;
 let sideRoot: string;
@@ -48,6 +57,8 @@ test("scans audio files recursively with metadata", async () => {
   assert.ok(nested);
   assert.equal(nested.name, "track-three.wav");
   assert.equal(nested.extension, "wav");
+  assert.equal(nested.title, "track-three");
+  assert.equal(nested.artist, null);
   assert.equal(nested.path, join(fixtureRoot, "album", "bonus", "track-three.wav"));
   assert.ok(Number.isFinite(Date.parse(nested.modifiedAt)));
 });
@@ -58,6 +69,40 @@ test("ignores non audio files and directories", async () => {
   const names = result.files.map((file) => file.name);
   assert.ok(!names.includes("cover.jpg"));
   assert.ok(!names.includes("notes.txt"));
+});
+
+test("returns tags when the audio file carries them", async () => {
+  const taggedRoot = await mkdtemp(join(tmpdir(), "riffl-tags-scan-"));
+
+  try {
+    const taggedPath = join(taggedRoot, "renamed-track.mp3");
+    const untaggedPath = join(taggedRoot, "untagged.flac");
+
+    await copyFile(
+      fileURLToPath(new URL("../fixtures/tone.mp3", import.meta.url)),
+      taggedPath,
+    );
+    await copyFile(
+      fileURLToPath(new URL("../fixtures/tone.flac", import.meta.url)),
+      untaggedPath,
+    );
+    writeTags(taggedPath, { title: "Night Drive", artist: "Com Truise" });
+
+    const result = await scanDirectory(taggedRoot);
+
+    const tagged = result.files.find((file) => file.name === "renamed-track.mp3");
+    const untagged = result.files.find((file) => file.name === "untagged.flac");
+
+    assert.ok(tagged);
+    assert.equal(tagged.title, "Night Drive");
+    assert.equal(tagged.artist, "Com Truise");
+
+    assert.ok(untagged);
+    assert.equal(untagged.title, "untagged");
+    assert.equal(untagged.artist, null);
+  } finally {
+    await rm(taggedRoot, { recursive: true, force: true });
+  }
 });
 
 test("throws PATH_NOT_FOUND for an unknown path", async () => {
