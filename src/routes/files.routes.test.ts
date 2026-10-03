@@ -82,5 +82,15 @@ test("returns the scanned audio files", async () => {
     response.body.files.map((file: { relativePath: string }) => file.relativePath),
     ["album/track-two.flac", "track-one.mp3"],
   );
+  assert.deepEqual(
+    response.body.files.map(
+      (file: { title: string; artist: string | null }) =>
+        [file.title, file.artist] as const,
+    ),
+    [
+      ["track-two", null],
+      ["track-one", null],
+    ],
+  );
   assert.ok(!response.body.files.some((file: { name: string }) => file.name === "cover.jpg"));
 });

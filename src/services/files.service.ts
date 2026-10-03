@@ -1,5 +1,6 @@
 import { readdir, stat } from "node:fs/promises";
-import { extname, join, relative, resolve } from "node:path";
+import { basename, extname, join, relative, resolve } from "node:path";
+import { readTags, type AudioTags } from "./tags.service.js";
 
 const AUDIO_EXTENSIONS = [".mp3", ".mp4", ".wav", ".ogg", ".flac"] as const;
 
@@ -24,6 +25,8 @@ export interface AudioFile {
   path: string;
   relativePath: string;
   name: string;
+  title: string;
+  artist: string | null;
   extension: string;
   size: number;
   modifiedAt: string;
@@ -54,6 +57,14 @@ function toScanError(error: unknown, message: string): ScanError {
   }
 
   return new ScanError("PATH_READ_ERROR", message);
+}
+
+function readTagsOrFallback(filePath: string): AudioTags {
+  try {
+    return readTags(filePath);
+  } catch {
+    return { title: null, artist: null };
+  }
 }
 
 async function walk(
@@ -95,10 +106,14 @@ async function walk(
       continue;
     }
 
+    const tags = readTagsOrFallback(fullPath);
+
     files.push({
       path: fullPath,
       relativePath: relative(rootPath, fullPath),
       name: entry.name,
+      title: tags.title ?? basename(entry.name, extname(entry.name)),
+      artist: tags.artist,
       extension: extname(entry.name).toLowerCase().slice(1),
       size: info.size,
       modifiedAt: info.mtime.toISOString(),
