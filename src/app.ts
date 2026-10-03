@@ -1,6 +1,7 @@
 import express from "express";
 import filesRoutes from "./routes/files.routes.js";
 import streamRoutes from "./routes/stream.routes.js";
+import action from "./routes/action.routes.js";
 
 export const app = express();
 
@@ -20,3 +21,5 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/stream", streamRoutes)
+
+app.use("/action", action);
