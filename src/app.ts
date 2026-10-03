@@ -1,5 +1,6 @@
 import express from "express";
 import filesRoutes from "./routes/files.routes.js";
+import streamRoutes from "./routes/stream.routes.js";
 
 export const app = express();
 
@@ -17,3 +18,5 @@ app.get("/health", (_req, res) => {
     service: "riffl",
   });
 });
+
+app.use("/stream", streamRoutes)
