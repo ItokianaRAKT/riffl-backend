@@ -7,6 +7,8 @@ The backend scans folders, streams audio files, moves files according to decisio
 ## Features
 
 - Recursive folder scanning with audio tag extraction.
+- Subdirectory listing used by the frontend folder browser.
+- Native OS folder dialog to pick the folder to review.
 - Audio streaming with HTTP `Range` support (seeking).
 - File sorting: each decision moves the file into a `riffl/<action>/` subfolder of its own directory.
 - Undo for the last move.
@@ -88,6 +90,39 @@ Recursively scans a directory and returns the audio files it contains. Symlinks 
 ```
 
 `title` falls back to the file name when the tag is missing. Errors: `PATH_MISSING` (400), `PATH_NOT_FOUND` (404), `PATH_NOT_DIRECTORY` (422), `PATH_NOT_ACCESSIBLE` (403), `PATH_READ_ERROR` (500).
+
+### `GET /files/directories?path=<absolute path>`
+
+Lists the subdirectories of a folder, so the UI can browse the filesystem instead of asking for a typed path. Hidden folders (starting with a dot), files, and symlinks are omitted, and the result is sorted case-insensitively. When `path` is omitted, the server's home directory is used.
+
+```json
+{
+  "path": "/home/you",
+  "parent": "/home",
+  "directories": [
+    { "name": "Music", "path": "/home/you/Music" },
+    { "name": "Videos", "path": "/home/you/Videos" }
+  ]
+}
+```
+
+`parent` is `null` at the filesystem root. Errors are the same as `/files/scan`.
+
+### `POST /files/pick-directory`
+
+Opens the operating system's native folder dialog on the machine running the server and returns the selected path. The request stays open until the dialog is closed or cancelled.
+
+```json
+{ "path": "/home/you/Music" }
+```
+
+`path` is `null` when the dialog is cancelled.
+
+| Code | Status | Meaning |
+| --- | --- | --- |
+| `PICKER_UNAVAILABLE` | 501 | No dialog tool is available, or there is no graphical session |
+
+Dialog tool per platform: `powershell` on Windows, `osascript` on macOS, and `zenity`, `yad`, or `kdialog` on Linux (install one of them if none is present).
 
 ### `GET /stream?path=<absolute path>`
 
