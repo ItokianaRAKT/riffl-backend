@@ -155,3 +155,31 @@ test(
     assert.equal(response.body.code, "PATH_NOT_ACCESSIBLE");
   },
 );
+
+test(
+  "returns 501 when no native folder dialog can be opened",
+  {
+    skip:
+      process.platform !== "linux"
+        ? "expects the display based linux dialog"
+        : false,
+  },
+  async () => {
+    const display = process.env.DISPLAY;
+    const waylandDisplay = process.env.WAYLAND_DISPLAY;
+    delete process.env.DISPLAY;
+    delete process.env.WAYLAND_DISPLAY;
+
+    try {
+      const response = await request(app).post("/files/pick-directory");
+
+      assert.equal(response.status, 501);
+      assert.equal(response.body.code, "PICKER_UNAVAILABLE");
+    } finally {
+      if (display !== undefined) process.env.DISPLAY = display;
+      if (waylandDisplay !== undefined) {
+        process.env.WAYLAND_DISPLAY = waylandDisplay;
+      }
+    }
+  },
+);
