@@ -222,8 +222,15 @@ async function assertBrowsableDirectory(directoryPath: string): Promise<void> {
 export async function listDirectories(
   rawPath?: string,
 ): Promise<DirectoryListing> {
-  const trimmedPath = rawPath?.trim();
-  const directoryPath = trimmedPath ? resolve(trimmedPath) : homedir();
+  let directoryPath: string;
+
+  if (rawPath === undefined) {
+    directoryPath = homedir();
+  } else if (rawPath.trim()) {
+    directoryPath = resolve(rawPath.trim());
+  } else {
+    throw new ScanError("PATH_MISSING", "Path parameter is required");
+  }
 
   await assertBrowsableDirectory(directoryPath);
 

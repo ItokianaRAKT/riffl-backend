@@ -1,6 +1,7 @@
 import { Router, type Response } from "express";
 import {
   ScanError,
+  listDirectories,
   scanDirectory,
   type ScanErrorCode,
 } from "../services/files.service.js";
@@ -55,6 +56,31 @@ router.get("/scan", async (req, res) => {
     return res.json(result);
   } catch (error) {
     return sendFileError(res, error, "scanning the directory");
+  }
+});
+
+router.get("/directories", async (req, res) => {
+  const rawPath = req.query.path;
+  let pathParam: string | undefined;
+
+  if (rawPath === undefined) {
+    pathParam = undefined;
+  } else if (typeof rawPath === "string") {
+    pathParam = rawPath;
+  } else if (Array.isArray(rawPath) && typeof rawPath[0] === "string") {
+    pathParam = rawPath[0];
+  } else {
+    return res.status(400).json({
+      error: "Invalid query parameter: path",
+      code: "PATH_MISSING",
+    });
+  }
+
+  try {
+    const result = await listDirectories(pathParam);
+    return res.json(result);
+  } catch (error) {
+    return sendFileError(res, error, "listing the directories");
   }
 });
 
