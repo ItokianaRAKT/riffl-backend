@@ -8,10 +8,10 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ScanError, scanDirectory } from "./files.service.js";
+import { ScanError, listDirectories, scanDirectory } from "./files.service.js";
 import { writeTags } from "./tags.service.js";
 
 let fixtureRoot: string;
@@ -135,6 +135,76 @@ test(
   async () => {
     await assert.rejects(
       scanDirectory(deniedRoot),
+      (error: unknown) =>
+        error instanceof ScanError && error.code === "PATH_NOT_ACCESSIBLE",
+    );
+  },
+);
+
+test("lists subdirectories and skips files and hidden folders", async () => {
+  const root = await mkdtemp(join(tmpdir(), "riffl-list-"));
+
+  try {
+    await mkdir(join(root, "Zebra"));
+    await mkdir(join(root, "alpha"));
+    await mkdir(join(root, ".hidden"));
+    await writeFile(join(root, "track-one.mp3"), "audio file");
+
+    const result = await listDirectories(root);
+
+    assert.equal(result.path, root);
+    assert.equal(result.parent, dirname(root));
+    assert.deepEqual(
+      result.directories.map((directory) => directory.name),
+      ["alpha", "Zebra"],
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("defaults to the home directory", async () => {
+  const result = await listDirectories();
+
+  assert.equal(result.path, homedir());
+});
+
+test("returns no parent at the filesystem root", async () => {
+  const result = await listDirectories(sep);
+
+  assert.equal(result.parent, null);
+});
+
+test("throws PATH_MISSING for a blank path", async () => {
+  await assert.rejects(
+    listDirectories("   "),
+    (error: unknown) =>
+      error instanceof ScanError && error.code === "PATH_MISSING",
+  );
+});
+
+test("throws PATH_NOT_FOUND for an unknown directory", async () => {
+  await assert.rejects(
+    listDirectories(join(fixtureRoot, "does-not-exist")),
+    (error: unknown) =>
+      error instanceof ScanError && error.code === "PATH_NOT_FOUND",
+  );
+});
+
+test("throws PATH_NOT_DIRECTORY when the path is a file", async () => {
+  await assert.rejects(
+    listDirectories(fileFixture),
+    (error: unknown) =>
+      error instanceof ScanError && error.code === "PATH_NOT_DIRECTORY",
+  );
+});
+
+test(
+  "throws PATH_NOT_ACCESSIBLE when listing an unreadable directory",
+  { skip: process.getuid?.() === 0 ? "cannot restrict access as root" : false },
+  async () => {
+    await assert.rejects(
+      listDirectories(deniedRoot),
       (error: unknown) =>
         error instanceof ScanError && error.code === "PATH_NOT_ACCESSIBLE",
     );
