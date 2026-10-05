@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import {
   ScanError,
   scanDirectory,
@@ -14,6 +14,21 @@ const ERROR_STATUS: Record<ScanErrorCode, number> = {
   PATH_NOT_ACCESSIBLE: 403,
   PATH_READ_ERROR: 500,
 };
+
+function sendFileError(res: Response, error: unknown, context: string): Response {
+  if (error instanceof ScanError) {
+    const status = ERROR_STATUS[error.code];
+
+    if (status >= 500) {
+      console.error(`Unexpected error while ${context}:`, error);
+    }
+
+    return res.status(status).json({ error: error.message, code: error.code });
+  }
+
+  console.error(`Unexpected error while ${context}:`, error);
+  return res.status(500).json({ error: "Internal server error" });
+}
 
 router.get("/", (_req, res) => {
   res.send("File route works!")
@@ -39,18 +54,7 @@ router.get("/scan", async (req, res) => {
     const result = await scanDirectory(pathParam);
     return res.json(result);
   } catch (error) {
-    if (error instanceof ScanError) {
-      const status = ERROR_STATUS[error.code];
-
-      if (status >= 500) {
-        console.error("Unexpected error while scanning directory:", error);
-      }
-
-      return res.status(status).json({ error: error.message, code: error.code });
-    }
-
-    console.error("Unexpected error while scanning directory:", error);
-    return res.status(500).json({ error: "Internal server error" });
+    return sendFileError(res, error, "scanning the directory");
   }
 });
 
