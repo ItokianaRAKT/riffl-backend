@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import request from "supertest";
 import { app } from "../app.js";
 
@@ -94,3 +94,64 @@ test("returns the scanned audio files", async () => {
   );
   assert.ok(!response.body.files.some((file: { name: string }) => file.name === "cover.jpg"));
 });
+
+test("lists the subdirectories of a folder", async () => {
+  const response = await request(app)
+    .get("/files/directories")
+    .query({ path: fixtureRoot });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.path, fixtureRoot);
+  assert.equal(response.body.parent, dirname(fixtureRoot));
+  assert.deepEqual(
+    response.body.directories.map((directory: { name: string }) => directory.name),
+    ["album"],
+  );
+});
+
+test("defaults to the home directory when no path is given", async () => {
+  const response = await request(app).get("/files/directories");
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.path, homedir());
+});
+
+test("returns 400 when the path is blank", async () => {
+  const response = await request(app)
+    .get("/files/directories")
+    .query({ path: " " });
+
+  assert.equal(response.status, 400);
+  assert.equal(response.body.code, "PATH_MISSING");
+});
+
+test("returns 404 when the listed path does not exist", async () => {
+  const response = await request(app)
+    .get("/files/directories")
+    .query({ path: join(fixtureRoot, "missing") });
+
+  assert.equal(response.status, 404);
+  assert.equal(response.body.code, "PATH_NOT_FOUND");
+});
+
+test("returns 422 when the listed path is not a directory", async () => {
+  const response = await request(app)
+    .get("/files/directories")
+    .query({ path: fileFixture });
+
+  assert.equal(response.status, 422);
+  assert.equal(response.body.code, "PATH_NOT_DIRECTORY");
+});
+
+test(
+  "returns 403 when the directory cannot be listed",
+  { skip: process.getuid?.() === 0 ? "cannot restrict access as root" : false },
+  async () => {
+    const response = await request(app)
+      .get("/files/directories")
+      .query({ path: deniedRoot });
+
+    assert.equal(response.status, 403);
+    assert.equal(response.body.code, "PATH_NOT_ACCESSIBLE");
+  },
+);
