@@ -4,9 +4,18 @@ import { copyFile, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readTags, writeTags, TagError } from "./tags.service.js";
+import { ByteVector, Picture, File } from "node-taglib-sharp";
+import {
+  readCover,
+  readTags,
+  writeTags,
+  TagError,
+} from "./tags.service.js";
 
 const FORMATS = ["mp3", "flac", "ogg", "mp4", "wav"] as const;
+const COVER_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+const COVER_BYTES = new Uint8Array(Buffer.from(COVER_BASE64, "base64"));
 const fixturesDirectory = fileURLToPath(
   new URL("../fixtures/", import.meta.url),
 );
@@ -80,4 +89,36 @@ test("throws TagError when the file has no readable tags", () => {
 
   assert.throws(() => readTags(path), TagError);
   assert.throws(() => writeTags(path, { title: "Night Drive" }), TagError);
+});
+
+test("reads null when the file has no embedded picture", () => {
+  for (const format of FORMATS) {
+    assert.equal(
+      readCover(join(workDirectory, `track.${format}`)),
+      null,
+      format,
+    );
+  }
+});
+
+test("writes and reads back an embedded picture", async () => {
+  const path = join(workDirectory, "with-cover.mp3");
+  await copyFile(join(fixturesDirectory, "tone.mp3"), path);
+
+  const file = File.createFromPath(path);
+  file.tag.pictures = [
+    Picture.fromData(ByteVector.fromByteArray(COVER_BYTES)),
+  ];
+  file.save();
+  file.dispose();
+
+  const cover = readCover(path);
+
+  assert.ok(cover);
+  assert.equal(cover.mimeType, "image/png");
+  assert.deepEqual(Buffer.from(cover.data), Buffer.from(COVER_BYTES));
+});
+
+test("throws TagError when reading the cover of an unreadable file", () => {
+  assert.throws(() => readCover(join(workDirectory, "fake.mp3")), TagError);
 });
