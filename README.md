@@ -8,7 +8,6 @@ The backend scans folders, streams audio files, moves files according to decisio
 
 - Recursive folder scanning with audio tag extraction.
 - Subdirectory listing used by the frontend folder browser.
-- Native OS folder dialog to pick the folder to review.
 - Audio streaming with HTTP `Range` support (seeking).
 - File sorting: each decision moves the file into a `riffl/<action>/` subfolder of its own directory.
 - Undo for the last move.
@@ -107,22 +106,6 @@ Lists the subdirectories of a folder, so the UI can browse the filesystem instea
 ```
 
 `parent` is `null` at the filesystem root. Errors are the same as `/files/scan`.
-
-### `POST /files/pick-directory`
-
-Opens the operating system's native folder dialog on the machine running the server and returns the selected path. The request stays open until the dialog is closed or cancelled.
-
-```json
-{ "path": "/home/you/Music" }
-```
-
-`path` is `null` when the dialog is cancelled.
-
-| Code | Status | Meaning |
-| --- | --- | --- |
-| `PICKER_UNAVAILABLE` | 501 | No dialog tool is available, or there is no graphical session |
-
-Dialog tool per platform: `powershell` on Windows, `osascript` on macOS, and `zenity`, `yad`, or `kdialog` on Linux (install one of them if none is present).
 
 ### `GET /stream?path=<absolute path>`
 

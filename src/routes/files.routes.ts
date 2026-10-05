@@ -5,7 +5,6 @@ import {
   scanDirectory,
   type ScanErrorCode,
 } from "../services/files.service.js";
-import { PickerError, pickDirectory } from "../services/picker.service.js";
 
 const router = Router();
 
@@ -82,20 +81,6 @@ router.get("/directories", async (req, res) => {
     return res.json(result);
   } catch (error) {
     return sendFileError(res, error, "listing the directories");
-  }
-});
-
-router.post("/pick-directory", async (_req, res) => {
-  try {
-    const path = await pickDirectory();
-    return res.json({ path });
-  } catch (error) {
-    if (error instanceof PickerError) {
-      return res.status(501).json({ error: error.message, code: error.code });
-    }
-
-    console.error("Unexpected error while opening the folder dialog:", error);
-    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
