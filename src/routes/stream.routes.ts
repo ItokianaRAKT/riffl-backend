@@ -1,49 +1,60 @@
 import { Router } from "express";
+import {
+  StreamError,
+  openStream,
+  parseRangeHeader,
+  resolveTarget,
+  type StreamErrorCode,
+} from "../services/stream.service.js";
+
 const stream = Router();
-import fs from "node:fs"
 
-stream.get("/", (req, res) => {
-  const filePath = req.query.path;
-  if (typeof filePath !== "string" || !filePath) {
-    return res.status(400).json({ error: "A file path is required" });
-  }
+const ERROR_STATUS: Record<StreamErrorCode, number> = {
+  PATH_MISSING: 400,
+  FILE_NOT_FOUND: 404,
+};
 
-  let fileSize: number;
+stream.get("/", async (req, res) => {
+  const rawPath = req.query.path;
+  const pathParam = typeof rawPath === "string" ? rawPath : undefined;
+
+  let target;
   try {
-    const stat = fs.statSync(filePath);
-    if (!stat.isFile()) throw new Error("Not a file");
-    fileSize = stat.size;
-  } catch {
-    return res.status(404).json({ error: "File not found" });
+    target = await resolveTarget(pathParam);
+  } catch (error) {
+    if (error instanceof StreamError) {
+      return res.status(ERROR_STATUS[error.code]).json({ error: error.message });
+    }
+
+    console.error("Unexpected error while resolving the stream path:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 
-  const range = req.headers.range;
-  let start = 0;
-  let end = fileSize - 1;
-  if (range) {
-    const [rawStart, rawEnd] = range.replace("bytes=", "").split("-");
-    start = Number(rawStart) || 0;
-    end = rawEnd ? Math.min(Number(rawEnd), fileSize - 1) : fileSize - 1;
-    if (start > end || start >= fileSize) {
-      return res.status(416).set("Content-Range", `bytes */${fileSize}`).json({
-        error: "Range not satisfiable",
-      });
-    }
+  const range = parseRangeHeader(req.headers.range, target.size);
+
+  if (range === "unsatisfiable") {
+    return res.status(416).set("Content-Range", `bytes */${target.size}`).json({
+      error: "Range not satisfiable",
+    });
   }
 
   if (range) {
     res.status(206).set({
-      "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+      "Content-Range": `bytes ${range.start}-${range.end}/${target.size}`,
       "Accept-Ranges": "bytes",
-      "Content-Length": String(end - start + 1),
+      "Content-Length": String(range.end - range.start + 1),
     });
   } else {
-    res.status(200).set({ "Accept-Ranges": "bytes", "Content-Length": String(fileSize) });
+    res.status(200).set({
+      "Accept-Ranges": "bytes",
+      "Content-Length": String(target.size),
+    });
   }
 
-  const fileStream = fs.createReadStream(filePath, { start, end });
-  fileStream.on("error", () => res.destroy());   // évite le crash du serveur
-  fileStream.pipe(res);                          // PLUS DE res.sendFile()
+  const byteRange = range ?? { start: 0, end: target.size - 1 };
+  const fileStream = openStream(target.path, byteRange);
+  fileStream.on("error", () => res.destroy());
+  fileStream.pipe(res);
 });
 
 export default stream;
