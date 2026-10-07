@@ -109,7 +109,11 @@ Lists the subdirectories of a folder, so the UI can browse the filesystem instea
 
 ### `GET /stream?path=<absolute path>`
 
-Streams the file. Supports `Range` requests (`206 Partial Content`, `416` on an unsatisfiable range). Errors: 400 without a path, 404 if the file is missing.
+Streams the file with a `Content-Type` derived from its extension: `audio/mpeg` (`.mp3`), `audio/mp4` (`.mp4`), `audio/wav` (`.wav`), `audio/ogg` (`.ogg`), `audio/flac` (`.flac`), `application/octet-stream` otherwise.
+
+`Range` requests are supported: `206 Partial Content` for a satisfiable range (bounded, open ended, or suffix like `bytes=-50`), `416` when the range starts past the end of the file. A `Range` header the server cannot parse is ignored and the whole file is sent.
+
+Errors: `PATH_MISSING` (400), `FILE_NOT_FOUND` (404), `NOT_A_FILE` (404), `RANGE_NOT_SATISFIABLE` (416).
 
 ### `POST /action`
 
