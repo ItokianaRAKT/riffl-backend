@@ -1,5 +1,6 @@
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
+import { extname } from "node:path";
 import type { Readable } from "node:stream";
 
 export type StreamErrorCode =
@@ -24,9 +25,24 @@ export interface ByteRange {
 
 export type RangeResult = ByteRange | null | "unsatisfiable";
 
+const CONTENT_TYPES: Record<string, string> = {
+  ".mp3": "audio/mpeg",
+  ".mp4": "audio/mp4",
+  ".wav": "audio/wav",
+  ".ogg": "audio/ogg",
+  ".flac": "audio/flac",
+};
+
+export function contentTypeFor(filePath: string): string {
+  return (
+    CONTENT_TYPES[extname(filePath).toLowerCase()] ?? "application/octet-stream"
+  );
+}
+
 export interface StreamTarget {
   path: string;
   size: number;
+  contentType: string;
 }
 
 export async function resolveTarget(
@@ -47,7 +63,11 @@ export async function resolveTarget(
     throw new StreamError("NOT_A_FILE", "Path is not a file");
   }
 
-  return { path: rawPath, size: info.size };
+  return {
+    path: rawPath,
+    size: info.size,
+    contentType: contentTypeFor(rawPath),
+  };
 }
 
 export function parseRangeHeader(

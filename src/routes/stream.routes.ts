@@ -52,11 +52,13 @@ stream.get("/", async (req, res) => {
       "Content-Range": `bytes ${range.start}-${range.end}/${target.size}`,
       "Accept-Ranges": "bytes",
       "Content-Length": String(range.end - range.start + 1),
+      "Content-Type": target.contentType,
     });
   } else {
     res.status(200).set({
       "Accept-Ranges": "bytes",
       "Content-Length": String(target.size),
+      "Content-Type": target.contentType,
     });
   }
 
