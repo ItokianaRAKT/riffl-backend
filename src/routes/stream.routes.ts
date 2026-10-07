@@ -64,6 +64,7 @@ stream.get("/", async (req, res) => {
 
   const fileStream = openStream(target.path, range);
   fileStream.on("error", () => res.destroy());
+  res.on("close", () => fileStream.destroy());
   fileStream.pipe(res);
 });
 
