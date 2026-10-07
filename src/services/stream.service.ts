@@ -89,6 +89,6 @@ export function parseRangeHeader(
   return { start, end };
 }
 
-export function openStream(path: string, range: ByteRange): Readable {
-  return createReadStream(path, range);
+export function openStream(path: string, range: ByteRange | null): Readable {
+  return range ? createReadStream(path, range) : createReadStream(path);
 }

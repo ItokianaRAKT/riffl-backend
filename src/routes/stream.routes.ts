@@ -62,8 +62,7 @@ stream.get("/", async (req, res) => {
     });
   }
 
-  const byteRange = range ?? { start: 0, end: target.size - 1 };
-  const fileStream = openStream(target.path, byteRange);
+  const fileStream = openStream(target.path, range);
   fileStream.on("error", () => res.destroy());
   fileStream.pipe(res);
 });
