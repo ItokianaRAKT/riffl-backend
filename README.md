@@ -193,7 +193,7 @@ src/
 ## Testing
 
 ```bash
-npm test        # unit + route tests (49 tests)
+npm test        # unit + route tests (97 tests)
 npm run lint
 npm run typecheck
 ```
