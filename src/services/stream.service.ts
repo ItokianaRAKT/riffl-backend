@@ -78,15 +78,42 @@ export function parseRangeHeader(
     return null;
   }
 
-  const [rawStart, rawEnd] = header.replace("bytes=", "").split("-");
-  const start = Number(rawStart) || 0;
-  const end = rawEnd ? Math.min(Number(rawEnd), size - 1) : size - 1;
+  const match = /^bytes=(\d*)-(\d*)$/i.exec(header);
+  if (!match) {
+    return null;
+  }
 
-  if (start > end || start >= size) {
+  const rawStart = match[1] ?? "";
+  const rawEnd = match[2] ?? "";
+
+  if (!rawStart) {
+    if (!rawEnd) {
+      return null;
+    }
+
+    const suffixLength = Number(rawEnd);
+    if (suffixLength === 0 || size === 0) {
+      return "unsatisfiable";
+    }
+
+    return { start: Math.max(0, size - suffixLength), end: size - 1 };
+  }
+
+  const start = Number(rawStart);
+  if (start >= size) {
     return "unsatisfiable";
   }
 
-  return { start, end };
+  if (!rawEnd) {
+    return { start, end: size - 1 };
+  }
+
+  const end = Number(rawEnd);
+  if (end < start) {
+    return null;
+  }
+
+  return { start, end: Math.min(end, size - 1) };
 }
 
 export function openStream(path: string, range: ByteRange | null): Readable {
