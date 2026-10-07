@@ -2,7 +2,10 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import type { Readable } from "node:stream";
 
-export type StreamErrorCode = "PATH_MISSING" | "FILE_NOT_FOUND";
+export type StreamErrorCode =
+  | "PATH_MISSING"
+  | "FILE_NOT_FOUND"
+  | "NOT_A_FILE";
 
 export class StreamError extends Error {
   readonly code: StreamErrorCode;
@@ -29,7 +32,7 @@ export interface StreamTarget {
 export async function resolveTarget(
   rawPath: string | undefined,
 ): Promise<StreamTarget> {
-  if (!rawPath) {
+  if (!rawPath || !rawPath.trim()) {
     throw new StreamError("PATH_MISSING", "A file path is required");
   }
 
@@ -41,7 +44,7 @@ export async function resolveTarget(
   }
 
   if (!info.isFile()) {
-    throw new StreamError("FILE_NOT_FOUND", "File not found");
+    throw new StreamError("NOT_A_FILE", "Path is not a file");
   }
 
   return { path: rawPath, size: info.size };

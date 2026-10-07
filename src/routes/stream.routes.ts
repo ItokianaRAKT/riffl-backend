@@ -12,18 +12,26 @@ const stream = Router();
 const ERROR_STATUS: Record<StreamErrorCode, number> = {
   PATH_MISSING: 400,
   FILE_NOT_FOUND: 404,
+  NOT_A_FILE: 404,
 };
 
 stream.get("/", async (req, res) => {
   const rawPath = req.query.path;
-  const pathParam = typeof rawPath === "string" ? rawPath : undefined;
+  const pathParam =
+    typeof rawPath === "string"
+      ? rawPath
+      : Array.isArray(rawPath) && typeof rawPath[0] === "string"
+        ? rawPath[0]
+        : undefined;
 
   let target;
   try {
     target = await resolveTarget(pathParam);
   } catch (error) {
     if (error instanceof StreamError) {
-      return res.status(ERROR_STATUS[error.code]).json({ error: error.message });
+      return res
+        .status(ERROR_STATUS[error.code])
+        .json({ error: error.message, code: error.code });
     }
 
     console.error("Unexpected error while resolving the stream path:", error);
@@ -35,6 +43,7 @@ stream.get("/", async (req, res) => {
   if (range === "unsatisfiable") {
     return res.status(416).set("Content-Range", `bytes */${target.size}`).json({
       error: "Range not satisfiable",
+      code: "RANGE_NOT_SATISFIABLE",
     });
   }
 
